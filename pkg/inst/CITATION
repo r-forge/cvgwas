@@ -1,0 +1,19 @@
+citHeader("To cite the package 'cvGWAS' or the method in publications use:")
+
+citEntry(entry="Article",
+         title = "The missing heritability revealed in Arabidopsis thaliana",
+         author = personList(as.person("Xia Shen")),
+         journal      = "Submitted",
+         year         = "2013",
+         volume       = "0",
+         number       = "0",
+         pages        = "0-0",
+         url          = "http://",
+         
+         textVersion = 
+         paste("Xia Shen (2013).", 
+               "The missing heritability revealed in Arabidopsis thaliana.",
+               "Submitted",
+               "URL http://")
+)
+
