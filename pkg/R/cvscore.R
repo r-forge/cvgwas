@@ -67,9 +67,19 @@
 	groups <- c(rep(1:(nfolds - 1), each = floor(n/nfolds)), rep(nfolds, n - (nfolds - 1)*floor(n/nfolds)))
 	if (!is.na(seed)) set.seed(seed)
 	groups  <- sample(groups, n)
-	if (verbose) cat('Cross validation:\n')
+	
 	R.raw <- matrix(0, nfolds, ncol(data@gtdata))
-	genomat <- as.double.gwaa.data(data)
+	genomat <- c()
+	if (verbose) cat('Allocating genotype matrix ...\n')
+	if (nrow(data@gtdata)*ncol(data@gtdata) < 9e8) {
+		genomat <- as.double.gwaa.data(data)
+	} else {
+		npiece <- ceiling(nrow(data@gtdata)*ncol(data@gtdata)/9e8)
+		nc <- c(rep(floor(ncol(data@gtdata)/npiece), npiece - 1), ncol(data@gtdata) - (npiece - 1)*floor(ncol(data@gtdata)/npiece))
+		cumnc <- c(0, cumsum(nc))
+		for (i in 1:npiece) genomat <- cbind(genomat, as.double.gwaa.data(data[,(cumnc[i] + 1):(cumnc[i]*nc[i])]))
+	}
+	if (verbose) cat('Cross validation:\n')
 	for (i in 1:nfolds) {
 		gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
 		beta <- gwa@results$effB
