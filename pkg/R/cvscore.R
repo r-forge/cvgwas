@@ -71,13 +71,20 @@
 	R.raw <- matrix(0, nfolds, ncol(data@gtdata))
 	genomat <- c()
 	if (verbose) cat('Allocating genotype matrix ...\n')
-	if (nrow(data@gtdata)*ncol(data@gtdata) < 9e8) {
+	N <- as.numeric(nrow(data@gtdata))
+	p <- as.numeric(ncol(data@gtdata))
+	pb <- txtProgressBar(style = 3)
+	if (N*p < 9e8) {
 		genomat <- as.double.gwaa.data(data)
+		setTxtProgressBar(pb, 1)
 	} else {
-		npiece <- ceiling(nrow(data@gtdata)*ncol(data@gtdata)/9e8)
-		nc <- c(rep(floor(ncol(data@gtdata)/npiece), npiece - 1), ncol(data@gtdata) - (npiece - 1)*floor(ncol(data@gtdata)/npiece))
+		npiece <- ceiling(N*p/9e8)
+		nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
 		cumnc <- c(0, cumsum(nc))
-		for (i in 1:npiece) genomat <- cbind(genomat, as.double.gwaa.data(data[,(cumnc[i] + 1):(cumnc[i]*nc[i])]))
+		for (i in 1:npiece) {
+			genomat <- cbind(genomat, as.double.gwaa.data(data[,(cumnc[i] + 1):(cumnc[i] + nc[i])]))
+			setTxtProgressBar(pb, i/npiece)
+		}
 	}
 	if (verbose) cat('Cross validation:\n')
 	for (i in 1:nfolds) {
