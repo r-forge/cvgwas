@@ -52,7 +52,7 @@
 #' 
 #' @keywords cross validation, genome-wide association study, predictive ability
 #' 
-"cvscore" <- function(formula, data, nfolds = 5, seed = NA, verbose = TRUE, ...)
+"cvscore" <- function(formula, data, nfolds = 5, seed = NA, verbose = TRUE, memory.saving = FALSE, ...)
 {
 	options(warn = -1)
 	y <- as.numeric(model.frame(formula, data = data, na.action = NULL)[,1])
@@ -69,32 +69,58 @@
 	groups  <- sample(groups, n)
 	
 	R.raw <- matrix(0, nfolds, ncol(data@gtdata))
-	genomat <- c()
-	if (verbose) cat('Allocating genotype matrix ...\n')
 	N <- as.numeric(nrow(data@gtdata))
 	p <- as.numeric(ncol(data@gtdata))
-	pb <- txtProgressBar(style = 3)
-	if (N*p < 9e8) {
-		genomat <- as.double.gwaa.data(data)
-		setTxtProgressBar(pb, 1)
+	if (!memory.saving) {
+		genomat <- c()
+		if (verbose) cat('Allocating genotype matrix ...\n')
+		if (verbose) pb <- txtProgressBar(style = 3)
+		if (N*p < 9e8) {
+			genomat <- as.double.gwaa.data(data)
+			if (verbose) setTxtProgressBar(pb, 1)
+		} else {
+			npiece <- ceiling(N*p/9e8)
+			nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
+			cumnc <- c(0, cumsum(nc))
+			for (i in 1:npiece) {
+				genomat <- cbind(genomat, as.double.gwaa.data(data[,(cumnc[i] + 1):(cumnc[i] + nc[i])]))
+				if (verbose) setTxtProgressBar(pb, i/npiece)
+			}
+		}
+		if (verbose) cat('\nCross validation:\n')
+		for (i in 1:nfolds) {
+			gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
+			beta <- gwa@results$effB
+			testmat <- genomat[data@phdata$id %in% id[groups == i],]
+			testy <- y[data@phdata$id %in% id[groups == i]]
+			R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
+			if (verbose) cat('fold', i, '\n')
+		}
 	} else {
-		npiece <- ceiling(N*p/9e8)
-		nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
-		cumnc <- c(0, cumsum(nc))
-		for (i in 1:npiece) {
-			genomat <- cbind(genomat, as.double.gwaa.data(data[,(cumnc[i] + 1):(cumnc[i] + nc[i])]))
-			setTxtProgressBar(pb, i/npiece)
+		if (verbose) cat('\nCross validation:\n')
+		for (i in 1:nfolds) {
+			gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
+			beta <- gwa@results$effB
+			if (N*p < 9e8) {
+				genomat <- as.double.gwaa.data(data)
+				testmat <- genomat[data@phdata$id %in% id[groups == i],]
+				testy <- y[data@phdata$id %in% id[groups == i]]
+				R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta0), use = "pairwise.complete.obs"))
+			} else {
+				npiece <- ceiling(N*p/9e8)
+				nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
+				cumnc <- c(0, cumsum(nc))
+				testy <- y[data@phdata$id %in% id[groups == i]]
+				for (j in 1:npiece) {
+					testmat <- as.double.gwaa.data(data[,(cumnc[j] + 1):(cumnc[j] + nc[j])])
+					testmat <- testmat[data@phdata$id %in% id[groups == i],]
+					R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]), use = "pairwise.complete.obs"))
+				}
+			}
+			if (verbose) cat('fold', i, '\n')
 		}
 	}
-	if (verbose) cat('Cross validation:\n')
-	for (i in 1:nfolds) {
-		gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
-		beta <- gwa@results$effB
-		testmat <- genomat[data@phdata$id %in% id[groups == i],]
-		testy <- y[data@phdata$id %in% id[groups == i]]
-		R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
-		if (verbose) cat('fold', i, '\n')
-	}
+
 	R2.raw <- R.raw**2
 	options(warn = 0)
 	res <- list(R2.est = colMeans(R2.raw, na.rm = TRUE), R2.raw = R2.raw, R.raw = R.raw)
