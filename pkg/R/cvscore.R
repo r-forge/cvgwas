@@ -105,7 +105,7 @@
 				genomat <- as.double.gwaa.data(data)
 				testmat <- genomat[data@phdata$id %in% id[groups == i],]
 				testy <- y[data@phdata$id %in% id[groups == i]]
-				R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta0), use = "pairwise.complete.obs"))
+				R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
 			} else {
 				npiece <- ceiling(N*p/9e8)
 				nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
