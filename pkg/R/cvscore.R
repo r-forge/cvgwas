@@ -60,15 +60,19 @@
 		naidx <- which(is.na(y))
 		id <- data@phdata$id[-naidx]
 		n <- nrow(data@phdata) - length(naidx)
+		m0 <- lm(formula, data = data@phdata[-naidx,])
 	} else {
 		id <- data@phdata$id
 		n <- nrow(data@phdata)
+		m0 <- lm(formula, data = data@phdata)
 	}
+	y <- m0$resid
+	
 	groups <- c(rep(1:(nfolds - 1), each = floor(n/nfolds)), rep(nfolds, n - (nfolds - 1)*floor(n/nfolds)))
 	if (!is.na(seed)) set.seed(seed)
 	groups  <- sample(groups, n)
 	
-	R.raw <- matrix(0, nfolds, ncol(data@gtdata))
+	R.raw <- MSE <- matrix(0, nfolds, ncol(data@gtdata))
 	N <- as.numeric(nrow(data@gtdata))
 	p <- as.numeric(ncol(data@gtdata))
 	if (!memory.saving) {
@@ -89,23 +93,27 @@
 		}
 		if (verbose) cat('\nCross validation:\n')
 		for (i in 1:nfolds) {
-			gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
+			gwa <- qtscore(y[groups != i], data = data, idsubset = id[groups != i])
 			beta <- gwa@results$effB
 			testmat <- genomat[data@phdata$id %in% id[groups == i],]
 			testy <- y[data@phdata$id %in% id[groups == i]]
-			R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
+			#R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
+			R.raw[i,] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
+			MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2)
 			if (verbose) cat('fold', i, '\n')
 		}
 	} else {
 		if (verbose) cat('\nCross validation:\n')
 		for (i in 1:nfolds) {
-			gwa <- qtscore(formula, data = data, idsubset = id[groups != i])
+			gwa <- qtscore(y[groups != i], data = data, idsubset = id[groups != i])
 			beta <- gwa@results$effB
 			if (N*p < 9e8) {
 				genomat <- as.double.gwaa.data(data)
 				testmat <- genomat[data@phdata$id %in% id[groups == i],]
 				testy <- y[data@phdata$id %in% id[groups == i]]
-				R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
+				#R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
+				R.raw[i,] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
+				MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2)
 			} else {
 				npiece <- ceiling(N*p/9e8)
 				nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
@@ -114,7 +122,9 @@
 				for (j in 1:npiece) {
 					testmat <- as.double.gwaa.data(data[,(cumnc[j] + 1):(cumnc[j] + nc[j])])
 					testmat <- testmat[data@phdata$id %in% id[groups == i],]
-					R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]), use = "pairwise.complete.obs"))
+					#R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]), use = "pairwise.complete.obs"))
+					R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
+					MSE[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- colMeans((testy - t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]))**2)
 				}
 			}
 			if (verbose) cat('fold', i, '\n')
@@ -122,6 +132,12 @@
 	}
 
 	R2.raw <- R.raw**2
+	R2.est <- colMeans(R2.raw, na.rm = TRUE)
+	RMSE <- sqrt(MSE)
+	R2.se <- sqrt(colVars(R2.raw)/nfolds)
 	options(warn = 0)
-	res <- list(R2.est = colMeans(R2.raw, na.rm = TRUE), R2.raw = R2.raw, R.raw = R.raw)
+	res <- list(R2.est = R2.est, R2.se = R2.se, R2.pt = pt(R2.est/R2.se, nfolds - 1, lower.tail = FALSE),
+			    R2.raw = R2.raw, R.raw = R.raw, MRMSE = colMeans(RMSE), RMSE = RMSE)
 }
+
+'colVars' <- function(x, na.rm = TRUE) colSums((t(t(x) - colMeans(x, na.rm = na.rm)))**2, na.rm = na.rm)/(nrow(x) - 1)
