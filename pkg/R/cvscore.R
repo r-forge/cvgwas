@@ -99,7 +99,7 @@
 			testy <- y[data@phdata$id %in% id[groups == i]]
 			#R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
 			R.raw[i,] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
-			MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2)
+			MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2, na.rm = TRUE)
 			if (verbose) cat('fold', i, '\n')
 		}
 	} else {
@@ -113,7 +113,7 @@
 				testy <- y[data@phdata$id %in% id[groups == i]]
 				#R.raw[i,] <- as.numeric(cor(testy, t(t(testmat)*beta), use = "pairwise.complete.obs"))
 				R.raw[i,] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
-				MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2)
+				MSE[i,] <- colMeans((testy - t(t(testmat)*beta))**2, na.rm = TRUE)
 			} else {
 				npiece <- ceiling(N*p/9e8)
 				nc <- c(rep(floor(p/npiece), npiece - 1), p - (npiece - 1)*floor(p/npiece))
@@ -124,7 +124,7 @@
 					testmat <- testmat[data@phdata$id %in% id[groups == i],]
 					#R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]), use = "pairwise.complete.obs"))
 					R.raw[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- as.numeric(cor(testy, testmat, use = "pairwise.complete.obs"))
-					MSE[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- colMeans((testy - t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]))**2)
+					MSE[i,(cumnc[j] + 1):(cumnc[j] + nc[j])] <- colMeans((testy - t(t(testmat)*beta[(cumnc[j] + 1):(cumnc[j] + nc[j])]))**2, na.rm = TRUE)
 				}
 			}
 			if (verbose) cat('fold', i, '\n')
@@ -137,7 +137,7 @@
 	R2.se <- sqrt(colVars(R2.raw)/nfolds)
 	options(warn = 0)
 	res <- list(R2.est = R2.est, R2.se = R2.se, R2.pt = pt(R2.est/R2.se, nfolds - 1, lower.tail = FALSE),
-			    R2.raw = R2.raw, R.raw = R.raw, MRMSE = colMeans(RMSE), RMSE = RMSE)
+			    R2.raw = R2.raw, R.raw = R.raw, MRMSE = colMeans(RMSE, na.rm = TRUE), RMSE = RMSE)
 }
 
 'colVars' <- function(x, na.rm = TRUE) colSums((t(t(x) - colMeans(x, na.rm = na.rm)))**2, na.rm = na.rm)/(nrow(x) - 1)
